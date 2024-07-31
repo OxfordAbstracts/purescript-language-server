@@ -42,7 +42,8 @@ in  upstream
   with literals.repo = "https://github.com/ilyakooo0/purescript-literals.git"
   with literals.version = "6875fb28026595cfb780318305a77e79b098bb01"
 
-  with psc-ide.version = "0f16603b3336340cbdbde197671cb96ff969a5f8"
+  with psc-ide.repo = "https://github.com/purefunctor/purescript-psc-ide.git"
+  with psc-ide.version = "103cf6c016b6a116ade59c0ae568f946a3b5c917"
   -- purescript-language-cst-parser v0.12.1 with bugfixes is not yet in the package set.
   with language-cst-parser =
     { dependencies =

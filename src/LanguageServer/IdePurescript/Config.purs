@@ -22,6 +22,7 @@ module LanguageServer.IdePurescript.Config
   , effectiveOutputDirectory
   , exportsCodeLens
   , fastRebuild
+  , focusedExternsCommand
   , foreignExt
   , formatter
   , fullBuildOnSave
@@ -50,6 +51,7 @@ import Prelude
 import Control.Monad.Except (runExcept)
 import Data.Either (either)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String as String
 import Data.Traversable (traverse)
 import Foreign (F, Foreign, readArray, readBoolean, readInt, readString)
 import Foreign.Index ((!))
@@ -221,3 +223,7 @@ exportsCodeLens = getBoolean "exportsCodeLens" true
 
 declarationTypeCodeLens :: ConfigFn Boolean
 declarationTypeCodeLens = getBoolean "declarationTypeCodeLens" true
+
+focusedExternsCommand :: ConfigFn (Maybe String)
+focusedExternsCommand = getString "focusedExternsCommand" "" >>> \v ->
+  if String.null v then Nothing else Just v

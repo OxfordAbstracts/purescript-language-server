@@ -7,10 +7,11 @@ import Prelude
 import Control.Monad.Except (runExcept)
 import Control.Promise (Promise)
 import Control.Promise as Promise
+import Data.Argonaut (decodeJson, parseJson)
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Foldable (or)
+import Data.Foldable (for_, or)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isNothing, maybe, maybe')
 import Data.Newtype (over, un, unwrap)
@@ -35,6 +36,7 @@ import Foreign.JSON (parseJSON)
 import Foreign.Object (Object)
 import Foreign.Object as Object
 import IdePurescript.Modules (getModulesForFileTemp, initialModulesState)
+import IdePurescript.PscIde as P
 import IdePurescript.PscIdeServer (ErrorLevel(..), Notify)
 import LanguageServer.IdePurescript.Assist (addClause, caseSplit, fillTypedHole, fixTypo)
 import LanguageServer.IdePurescript.Build as Build
@@ -68,6 +70,9 @@ import LanguageServer.Protocol.Uri (uriToFilename)
 import LanguageServer.Protocol.Window (createWorkDoneProgress, showError, showWarningWithActions, workBegin, workDone)
 import LanguageServer.Protocol.Workspace (codeLensRefresh)
 import Literals.Null (null)
+import Node.Buffer as Buffer
+import Node.ChildProcess as ChildProcess
+import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
 import Node.FS.Sync as FSSync
 import Node.Path (resolve)
@@ -266,6 +271,27 @@ buildWarningDialog config conn state notify msg = do
     --Build.buildProject config conn state notify true documents []
     liftEffect $ Build.requestFullBuild config conn state notify
 
+-- | TODO: bookkeeping for newly created files?
+-- | TODO: cache results in output folder?
+getFocusedExterns :: Ref Foreign -> Notify -> Aff (Maybe (Array String))
+getFocusedExterns config notify = do
+  settings <- liftEffect $ Ref.read config
+  case Config.focusedExternsCommand settings of
+    Just focusCommand -> liftEffect do
+      notify Info $ "Running: " <> focusCommand
+      buffer <- ChildProcess.execSync focusCommand ChildProcess.defaultExecSyncOptions
+      string <- Buffer.toString UTF8 buffer
+      case parseJson string >>= decodeJson of
+        Right initialFocused -> do
+          notify Info "Got modules to focus on!"
+          pure $ Just initialFocused
+        Left _ -> do
+          notify Info "focusedExternsCommand failed!"
+          pure Nothing
+    Nothing -> do
+      liftEffect $ notify Info "Skipping focus entirely!"
+      pure Nothing
+
 -- | Tries to start IDE server at workspace root
 mkStartPscIdeServer ::
   Ref Foreign -> Connection -> Ref ServerState -> Notify -> Aff Unit
@@ -276,9 +302,11 @@ mkStartPscIdeServer config conn state notify = do
     { title: "Starting PureScript IDE server" }
   rootPath <- liftEffect $ Build.getWorkspaceRoot state
   settings <- liftEffect $ Ref.read config
+  initialFocused <- getFocusedExterns config notify
   startRes <- Server.startServer' settings rootPath notify notify
   Server.retry notify 6 case startRes of
     { port: Just port, quit, purs } -> do
+      for_ initialFocused $ P.focus port
       Server.loadAll port
         >>= case _ of
           Left msg
@@ -464,7 +492,9 @@ handleEvents config conn state documents notify = do
         (getReferences notify documents)
   onHover conn
     $ runHandler
-        "onHover" getTextDocUri (getTooltips notify documents)
+        "onHover"
+        getTextDocUri
+        (getTooltips notify documents)
   onCodeAction conn
     $ runHandler
         "onCodeAction"

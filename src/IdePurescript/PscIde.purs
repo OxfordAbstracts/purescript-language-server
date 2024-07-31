@@ -2,6 +2,7 @@ module IdePurescript.PscIde
   ( ModuleSearchResult
   , SearchResult
   , cwd
+  , focus
   , eitherToErr
   , getAvailableModules
   , getCompletion
@@ -43,6 +44,9 @@ result f a = eitherToErr ((f <$> _) <$> a)
 
 cwd :: Int -> Aff String
 cwd = result runMsg <<< P.cwd
+
+focus :: Int -> Array String -> Aff String
+focus port modules = result runMsg $ P.focus port modules
 
 runMsg :: C.Message -> String
 runMsg (C.Message m) = m
