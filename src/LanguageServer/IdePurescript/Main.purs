@@ -18,6 +18,7 @@ import Data.Newtype (over, un, unwrap)
 import Data.Nullable (toMaybe, toNullable)
 import Data.Nullable as Nullable
 import Data.Profunctor.Strong (first)
+import Data.Set as Set
 import Data.String (Pattern(..), contains)
 import Data.String as String
 import Data.Traversable (for, traverse)
@@ -103,6 +104,8 @@ defaultServerState =
     , diagnostics: Map.empty
     , clientCapabilities: Nothing
     , parsedModules: Map.empty
+    , focusedModules: Set.empty
+    , didFocusedChange: false
     }
 
 modifyState ::
@@ -306,7 +309,11 @@ mkStartPscIdeServer config conn state notify = do
   startRes <- Server.startServer' settings rootPath notify notify
   Server.retry notify 6 case startRes of
     { port: Just port, quit, purs } -> do
-      for_ initialFocused $ P.focus port
+      for_ initialFocused \initialFocused' -> do
+        void $ P.focus port initialFocused'
+        liftEffect $ Ref.modify_
+          (over ServerState $ _ { focusedModules = Set.fromFoldable initialFocused' })
+          state
       Server.loadAll port
         >>= case _ of
           Left msg

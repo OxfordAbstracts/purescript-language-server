@@ -12,6 +12,7 @@ import Prelude
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
+import Data.Set (Set)
 import Effect.Aff (Aff, Fiber)
 import Effect.Timer (TimeoutId)
 import Foreign (Foreign)
@@ -72,6 +73,8 @@ type ServerStateRec =
         , parsed :: RecoveredParserResult Module
         , document :: TextDocument
         }
+  , focusedModules :: Set String
+  , didFocusedChange :: Boolean
   }
 
 newtype ServerState = ServerState ServerStateRec

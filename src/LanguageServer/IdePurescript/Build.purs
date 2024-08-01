@@ -43,6 +43,7 @@ import Effect.Timer (clearTimeout, setTimeout)
 import Foreign (Foreign)
 import IdePurescript.Build (Command(Command), build, rebuild)
 import IdePurescript.PscErrors (PscResult(..))
+import IdePurescript.PscIde (focus)
 import IdePurescript.PscIdeServer (ErrorLevel(..), Notify)
 import LanguageServer.IdePurescript.Config as Config
 import LanguageServer.IdePurescript.FileTypes as FileTypes
@@ -733,7 +734,6 @@ fullBuild logCb settings state = do
                 $ "Couldn't reload modules, no ide server port"
 
             Just port -> do
-              pure unit
               attempt (loadAll port)
                 >>= case _ of
                   Left e ->
@@ -849,14 +849,20 @@ parseModuleDocument state document = do
   v <- getVersion document
   text <- getText document
   let res = CST.parseModule text
+  let mn = Set.fromFoldable $ un ModuleName <$> unwrapModuleName res
   modifyState_ state
-    ( \s ->
+    ( \s -> do
+        let 
+          newFocusedModules = s.focusedModules `Set.union` mn
+          didFocusedChange = not $ Set.isEmpty mn
         s
           { modulesFile = Nothing
           , parsedModules =
               Map.insert (getUri document)
                 { version: v, parsed: res, document }
                 s.parsedModules
+          , focusedModules = newFocusedModules
+          , didFocusedChange = didFocusedChange
           }
     )
   pure res
@@ -896,6 +902,13 @@ fullBuildWithDiagnostics config conn state notify withProgress = do
       $ progressReporter
           <#> flip workBegin { title: "Building PureScript" }
     sendDiagnosticsBegin conn
+  -- Check if we need to focus any new modules before a full build.
+  liftEffect (Ref.read state) >>= case _ of
+    ServerState { port: Just port, focusedModules, didFocusedChange } | didFocusedChange -> do
+      void $ focus port $ Array.fromFoldable focusedModules
+      liftEffect $ Ref.modify_ (over ServerState $ _ { didFocusedChange = false }) state
+    _ ->
+      pure unit
   st <- liftEffect $ Ref.read state
   cfg <- liftEffect $ Ref.read config
   fullBuild notify cfg st
