@@ -22,7 +22,6 @@ module LanguageServer.IdePurescript.Config
   , effectiveOutputDirectory
   , exportsCodeLens
   , fastRebuild
-  , focusedExternsCommand
   , foreignExt
   , formatter
   , fullBuildOnSave
@@ -44,6 +43,7 @@ module LanguageServer.IdePurescript.Config
   , pursExe
   , sourceGlobs
   , srcPath
+  , packageName
   ) where
 
 import Prelude
@@ -224,6 +224,6 @@ exportsCodeLens = getBoolean "exportsCodeLens" true
 declarationTypeCodeLens :: ConfigFn Boolean
 declarationTypeCodeLens = getBoolean "declarationTypeCodeLens" true
 
-focusedExternsCommand :: ConfigFn (Maybe String)
-focusedExternsCommand = getString "focusedExternsCommand" "" >>> \v ->
+packageName :: ConfigFn (Maybe String)
+packageName = getString "packageName" "" >>> \v ->
   if String.null v then Nothing else Just v

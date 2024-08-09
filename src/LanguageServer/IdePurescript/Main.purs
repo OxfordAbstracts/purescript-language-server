@@ -4,6 +4,7 @@ module LanguageServer.IdePurescript.Main
 
 import Prelude
 
+import Control.Apply (lift2)
 import Control.Monad.Except (runExcept)
 import Control.Promise (Promise)
 import Control.Promise as Promise
@@ -76,7 +77,8 @@ import Node.ChildProcess as ChildProcess
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
 import Node.FS.Sync as FSSync
-import Node.Path (resolve)
+import Node.Path (FilePath, resolve)
+import Node.Path as Path
 import Node.Process as Process
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -279,20 +281,35 @@ buildWarningDialog config conn state notify msg = do
 getFocusedExterns :: Ref Foreign -> Notify -> Aff (Maybe (Array String))
 getFocusedExterns config notify = do
   settings <- liftEffect $ Ref.read config
-  case Config.focusedExternsCommand settings of
-    Just focusCommand -> liftEffect do
-      notify Info $ "Running: " <> focusCommand
-      buffer <- ChildProcess.execSync focusCommand ChildProcess.defaultExecSyncOptions
+  case lift2 Tuple (Config.outputDirectory settings) (Config.packageName settings) of
+    Just (Tuple outputDirectory packageName) -> liftEffect do
+      cwd <- Process.cwd
+
+      let
+        inferredRoot :: FilePath
+        inferredRoot = Path.dirname outputDirectory
+
+        innerCommand :: String
+        innerCommand = "purs graph $(spago sources -p " <> packageName <> ")"
+
+        outerCommand :: String
+        outerCommand = "zsh -c '" <> innerCommand <> "' | jq 'keys'"
+
+      buffer <- ChildProcess.execSync outerCommand $ ChildProcess.defaultExecSyncOptions
+        { cwd = Just $ Path.concat [ cwd, inferredRoot ]
+        }
       string <- Buffer.toString UTF8 buffer
+ 
       case parseJson string >>= decodeJson of
         Right initialFocused -> do
-          notify Info "Got modules to focus on!"
+          notify Info $ "getFocusedExterns: loading " <> packageName <> " externs"
           pure $ Just initialFocused
         Left _ -> do
-          notify Info "focusedExternsCommand failed!"
+          liftEffect $ notify Warning "getFocusedExterns: loading all externs"
           pure Nothing
+
     Nothing -> do
-      liftEffect $ notify Info "Skipping focus entirely!"
+      liftEffect $ notify Warning "getFocusedExterns: loading all externs"
       pure Nothing
 
 -- | Tries to start IDE server at workspace root
