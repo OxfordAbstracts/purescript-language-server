@@ -304,7 +304,8 @@ getSpagoNextSources settings logCb =
         Right packageSources -> do
           logCb Info $
             "oa-fork: found " <> show (Array.length packageSources) <> " files"
-          pure packageSources
+          pure $ packageSources <#> \packageSource ->
+            Path.concat [ inferredRoot, packageSource ]
         Left _ -> do
           logCb Warning "oa-fork: failed to decode response! falling back to empty files"
           pure []
@@ -313,41 +314,27 @@ getSpagoNextSources settings logCb =
 
 -- | TODO: bookkeeping for newly created files?
 -- | TODO: cache results in output folder?
-getFocusedExterns :: Foreign -> Array String -> Notify -> Aff (Maybe (Array String))
-getFocusedExterns settings packageGlobs notify = liftEffect do
-  case Config.outputDirectory settings of
-    Just outputDirectory -> liftEffect do
-      cwd <- Process.cwd
+getFocusedExterns :: Array String -> Notify -> Aff (Maybe (Array String))
+getFocusedExterns packageGlobs notify = liftEffect do
+  let
+    innerCommand :: String
+    innerCommand = "purs graph " <> Array.intercalate " " packageGlobs
 
-      let
-        inferredRoot :: FilePath
-        inferredRoot = Path.dirname outputDirectory
+    outerCommand :: String
+    outerCommand = "zsh -c '" <> innerCommand <> "' | jq 'keys'"
 
-        innerCommand :: String
-        innerCommand = "purs graph " <> Array.intercalate " " packageGlobs
+  notify Info $ "oa-fork: " <> outerCommand
 
-        outerCommand :: String
-        outerCommand = "zsh -c '" <> innerCommand <> "' | jq 'keys'"
+  buffer <- ChildProcess.execSync outerCommand ChildProcess.defaultExecSyncOptions
+  string <- Buffer.toString UTF8 buffer
 
-      notify Info $ "oa-fork: " <> outerCommand
-      notify Info $ "oa-fork: " <> Path.concat [ cwd, inferredRoot ]
-
-      buffer <- ChildProcess.execSync outerCommand $ ChildProcess.defaultExecSyncOptions
-        { cwd = Just $ Path.concat [ cwd, inferredRoot ]
-        }
-      string <- Buffer.toString UTF8 buffer
-
-      case parseJson string >>= decodeJson of
-        Right initialFocused -> do
-          notify Info $
-            "oa-fork: found " <> show (Array.length initialFocused) <> " externs."
-          pure $ Just initialFocused
-        Left _ -> do
-          notify Warning "or-fork: failed to decode response! falling back to all externs"
-          pure Nothing
-
-    Nothing -> do
-      liftEffect $ notify Warning "oa-fork: forgot to set outputDirectory!"
+  case parseJson string >>= decodeJson of
+    Right initialFocused -> do
+      notify Info $
+        "oa-fork: found " <> show (Array.length initialFocused) <> " externs."
+      pure $ Just initialFocused
+    Left _ -> do
+      notify Warning "or-fork: failed to decode response! falling back to all externs"
       pure Nothing
 
 -- | Tries to start IDE server at workspace root
@@ -361,7 +348,7 @@ mkStartPscIdeServer config conn state notify = do
   rootPath <- liftEffect $ Build.getWorkspaceRoot state
   settings <- liftEffect $ Ref.read config
   spagoNextSources <- getSpagoNextSources settings notify
-  initialFocused <- getFocusedExterns settings spagoNextSources notify
+  initialFocused <- getFocusedExterns spagoNextSources notify
   startRes <- Server.startServer' settings rootPath spagoNextSources notify notify
   Server.retry notify 6 case startRes of
     { port: Just port, quit, purs } -> do
