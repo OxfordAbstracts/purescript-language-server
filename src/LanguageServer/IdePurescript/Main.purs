@@ -276,13 +276,47 @@ buildWarningDialog config conn state notify msg = do
     --Build.buildProject config conn state notify true documents []
     liftEffect $ Build.requestFullBuild config conn state notify
 
--- | TODO: bookkeeping for newly created files?
--- | TODO: cache results in output folder?
-getFocusedExterns :: Ref Foreign -> Notify -> Aff (Maybe (Array String))
-getFocusedExterns config notify = do
-  settings <- liftEffect $ Ref.read config
+getSpagoNextSources :: Settings -> Notify -> Aff (Array String)
+getSpagoNextSources settings logCb =
   case lift2 Tuple (Config.outputDirectory settings) (Config.packageName settings) of
     Just (Tuple outputDirectory packageName) -> liftEffect do
+      logCb Info $ "oa-fork: finding sources for " <> packageName
+      cwd <- Process.cwd
+      let
+        inferredRoot :: FilePath
+        inferredRoot = Path.dirname outputDirectory
+
+        innerCommand :: String
+        innerCommand = "spago sources --json -p " <> packageName
+
+        outerCommand :: String
+        outerCommand = "zsh -c '" <> innerCommand <> "'"
+
+      logCb Info $ "oa-fork: " <> outerCommand
+      logCb Info $ "oa-fork: " <> Path.concat [ cwd, inferredRoot ]
+
+      buffer <- ChildProcess.execSync outerCommand $ ChildProcess.defaultExecSyncOptions
+        { cwd = Just $ Path.concat [ cwd, inferredRoot ]
+        }
+      string <- Buffer.toString UTF8 buffer
+
+      case parseJson string >>= decodeJson of
+        Right packageSources -> do
+          logCb Info $
+            "oa-fork: found " <> show (Array.length packageSources) <> " files"
+          pure packageSources
+        Left _ -> do
+          logCb Warning "oa-fork: failed to decode response! falling back to empty files"
+          pure []
+    Nothing ->
+      pure []
+
+-- | TODO: bookkeeping for newly created files?
+-- | TODO: cache results in output folder?
+getFocusedExterns :: Foreign -> Array String -> Notify -> Aff (Maybe (Array String))
+getFocusedExterns settings packageGlobs notify = liftEffect do
+  case Config.outputDirectory settings of
+    Just outputDirectory -> liftEffect do
       cwd <- Process.cwd
 
       let
@@ -290,26 +324,30 @@ getFocusedExterns config notify = do
         inferredRoot = Path.dirname outputDirectory
 
         innerCommand :: String
-        innerCommand = "purs graph $(spago sources -p " <> packageName <> ")"
+        innerCommand = "purs graph " <> Array.intercalate " " packageGlobs
 
         outerCommand :: String
         outerCommand = "zsh -c '" <> innerCommand <> "' | jq 'keys'"
+
+      notify Info $ "oa-fork: " <> outerCommand
+      notify Info $ "oa-fork: " <> Path.concat [ cwd, inferredRoot ]
 
       buffer <- ChildProcess.execSync outerCommand $ ChildProcess.defaultExecSyncOptions
         { cwd = Just $ Path.concat [ cwd, inferredRoot ]
         }
       string <- Buffer.toString UTF8 buffer
- 
+
       case parseJson string >>= decodeJson of
         Right initialFocused -> do
-          notify Info $ "getFocusedExterns: loading " <> packageName <> " externs"
+          notify Info $
+            "oa-fork: found " <> show (Array.length initialFocused) <> " externs."
           pure $ Just initialFocused
         Left _ -> do
-          liftEffect $ notify Warning "getFocusedExterns: loading all externs"
+          notify Warning "or-fork: failed to decode response! falling back to all externs"
           pure Nothing
 
     Nothing -> do
-      liftEffect $ notify Warning "getFocusedExterns: loading all externs"
+      liftEffect $ notify Warning "oa-fork: forgot to set outputDirectory!"
       pure Nothing
 
 -- | Tries to start IDE server at workspace root
@@ -322,8 +360,9 @@ mkStartPscIdeServer config conn state notify = do
     { title: "Starting PureScript IDE server" }
   rootPath <- liftEffect $ Build.getWorkspaceRoot state
   settings <- liftEffect $ Ref.read config
-  initialFocused <- getFocusedExterns config notify
-  startRes <- Server.startServer' settings rootPath notify notify
+  spagoNextSources <- getSpagoNextSources settings notify
+  initialFocused <- getFocusedExterns settings spagoNextSources notify
+  startRes <- Server.startServer' settings rootPath spagoNextSources notify notify
   Server.retry notify 6 case startRes of
     { port: Just port, quit, purs } -> do
       for_ initialFocused \initialFocused' -> do

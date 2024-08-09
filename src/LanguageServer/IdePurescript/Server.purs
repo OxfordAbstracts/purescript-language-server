@@ -54,10 +54,11 @@ getEnvPursIdeSources = liftEffect $ lookupEnv "PURS_IDE_SOURCES"
 startServer' ::
   Settings ->
   String ->
+  Array String -> 
   Notify ->
   Notify ->
   Aff { port :: Maybe Int, quit :: Aff Unit, purs :: Maybe Executable }
-startServer' settings root cb logCb = do
+startServer' settings root extraGlobs cb logCb = do
   envIdeSources <- getEnvPursIdeSources
   packageGlobs <- case envIdeSources of
     Just sourcesString -> do
@@ -85,7 +86,7 @@ startServer' settings root cb logCb = do
     logCb
   where
   globs = getGlob Config.srcPath <> getGlob Config.packagePath <>
-    Config.sourceGlobs settings
+    Config.sourceGlobs settings <> extraGlobs
   getGlob fn =
     fn settings
       # case _ of

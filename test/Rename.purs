@@ -215,7 +215,7 @@ prepare = do
   let rootPath = cwdDir <> "/test"
 
   let settings = unsafeToForeign {}
-  startRes <- PursIde.startServer' settings rootPath notify notify
+  startRes <- PursIde.startServer' settings rootPath [] notify notify
 
   case startRes of
     { port: Just port } -> do
