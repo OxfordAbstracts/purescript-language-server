@@ -8,7 +8,7 @@ import Control.Apply (lift2)
 import Control.Monad.Except (runExcept)
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Argonaut (decodeJson, parseJson)
+import Data.Argonaut (decodeJson, parseJson, printJsonDecodeError)
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Either (Either(..), either)
@@ -321,7 +321,7 @@ getFocusedExterns packageGlobs notify = liftEffect do
     innerCommand = "purs graph " <> Array.intercalate " " packageGlobs
 
     outerCommand :: String
-    outerCommand = "zsh -c '" <> innerCommand <> "' | jq 'keys'"
+    outerCommand = "zsh -o null_glob -c '" <> innerCommand <> "' | jq 'keys'"
 
   notify Info $ "oa-fork: " <> outerCommand
 
@@ -333,8 +333,9 @@ getFocusedExterns packageGlobs notify = liftEffect do
       notify Info $
         "oa-fork: found " <> show (Array.length initialFocused) <> " externs."
       pure $ Just initialFocused
-    Left _ -> do
-      notify Warning "or-fork: failed to decode response! falling back to all externs"
+    Left e -> do
+      notify Warning $ "oa-fork: failed with " <> printJsonDecodeError e
+      notify Warning "oa-fork: failed to decode response! falling back to all externs"
       pure Nothing
 
 -- | Tries to start IDE server at workspace root
