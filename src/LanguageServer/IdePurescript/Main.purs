@@ -34,6 +34,7 @@ import Effect.Console as Console
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import Foreign (Foreign, unsafeToForeign)
+import Foreign.Internal.Stringify (unsafeStringify)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (Object)
 import Foreign.Object as Object
@@ -705,10 +706,19 @@ main = do
       maybe (pure unit)
         (flip (FSSync.writeTextFile Encoding.UTF8) "Starting logging...\n")
         args.filename
-      let
-        config' = case args.config of
-          Just c -> either (const Nothing) Just $ runExcept $ parseJSON c
-          Nothing -> Nothing
+      config' <- case args.config of
+        Just n | n == "oxford-abstracts" -> do
+          cwd <- Process.cwd
+          maybeFile <- try $ FSSync.readTextFile UTF8 (Path.concat [ cwd, ".oa-ide.json"])
+          case maybeFile of
+            Left _ -> 
+              pure Nothing
+            Right c -> 
+              pure $ either (const Nothing) Just $ runExcept $ parseJSON c
+        Just c -> 
+          pure $ either (const Nothing) Just $ runExcept $ parseJSON c
+        Nothing -> 
+          pure $ Nothing
       main' { config: config', filename: args.filename }
 
 main' ::
@@ -728,3 +738,4 @@ main' { filename: logFile, config: cmdLineConfig } = do
     notify
   plsVersion <- version
   log conn $ "PureScript Language Server started (" <> plsVersion <> ")"
+  log conn $ "Using Configuration" <> unsafeStringify cmdLineConfig
