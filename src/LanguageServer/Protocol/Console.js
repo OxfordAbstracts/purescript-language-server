@@ -1,12 +1,4 @@
-export var log = function (conn) { return function (s) { return function () {
-    return conn.console.log(s);
-}; }; };
-export var info = function (conn) { return function (s) { return function () {
-    return conn.console.info(s);
-}; }; };
-export var warn = function (conn) { return function (s) { return function () {
-    return conn.console.warn(s);
-}; }; };
-export var error = function (conn) { return function (s) { return function () {
-    return conn.console.error(s);
-}; }; };
+export const log = (conn) => (s) => () => conn.console.log(s);
+export const info = (conn) => (s) => () => conn.console.info(s);
+export const warn = (conn) => (s) => () => conn.console.warn(s);
+export const error = (conn) => (s) => () => conn.console.error(s);

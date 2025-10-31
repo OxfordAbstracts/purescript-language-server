@@ -1,5 +1,3 @@
 import { URI } from "vscode-uri";
-export var uriToFilename = function (uri) { return function () { return URI.parse(uri).fsPath; }; };
-export var filenameToUri = function (filename) { return function () {
-    return URI.file(filename).toString();
-}; };
+export const uriToFilename = (uri) => () => URI.parse(uri).fsPath;
+export const filenameToUri = (filename) => () => URI.file(filename).toString();

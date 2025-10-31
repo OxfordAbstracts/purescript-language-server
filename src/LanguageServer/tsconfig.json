@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
     "module": "ESNext",
-    "target": "ES5",
+    "target": "ES2017",
     "moduleResolution": "NodeNext",
     "sourceMap": false,
     "noImplicitAny": true,
     "newLine": "LF",
-    "lib": ["es2015"]
+    "lib": ["ES2017"]
   }
 }
