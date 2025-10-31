@@ -1,0 +1,103 @@
+
+package:
+  name: ide-purescript
+  dependencies:
+    - aff
+    - aff-promise
+    - ansi
+    - argonaut
+    - argonaut-codecs
+    - argonaut-core
+    - argonaut-generic
+    - arrays
+    - avar
+    - bifunctors
+    - console
+    - contravariant
+    - control
+    - datetime
+    - debug
+    - effect
+    - either
+    - enums
+    - exceptions
+    - foldable-traversable
+    - foreign
+    - foreign-object
+    - formatters
+    - functions
+    - integers
+    - js-bigints
+    - js-date
+    - js-timers
+    - language-cst-parser
+    - lists
+    - literals
+    - maybe
+    - newtype
+    - node-buffer
+    - node-child-process
+    - node-event-emitter
+    - node-fs
+    - node-os
+    - node-path
+    - node-process
+    - node-streams
+    - nonempty
+    - nullable
+    - ordered-collections
+    - parallel
+    - partial
+    - prelude
+    - profunctor
+    - profunctor-lenses
+    - psc-ide
+    - rationals
+    - refs
+    - result
+    - spec
+    - spec-node
+    - strings
+    - stringutils
+    - test-unit
+    - transformers
+    - tuples
+    - unfoldable
+    - unsafe-coerce
+    - untagged-union
+    - uuid
+
+workspace:
+  packageSet:
+    registry: 66.8.0
+  buildOpts:
+    censorLibraryWarnings: all
+  extraPackages:
+    psc-ide:
+      git: https://github.com/kRITZCREEK/purescript-psc-ide
+      ref: 5cc2cd48d067f72a760b970080d0ef0a4b427fdf
+      dependencies:
+        - aff
+        - argonaut
+        - argonaut-codecs
+        - argonaut-core
+        - arrays
+        - bifunctors
+        - control
+        - datetime
+        - effect
+        - either
+        - exceptions
+        - foldable-traversable
+        - foreign-object
+        - integers
+        - maybe
+        - node-buffer
+        - node-child-process
+        - node-fs
+        - node-path
+        - nullable
+        - parallel
+        - prelude
+        - random
+        - strings

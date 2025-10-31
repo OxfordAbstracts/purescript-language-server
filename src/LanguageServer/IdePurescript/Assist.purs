@@ -24,7 +24,6 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Foreign (F, Foreign, readInt, readString, unsafeFromForeign, unsafeToForeign)
 import Foreign.Index ((!))
-import Foreign.NullOrUndefined (readNullOrUndefined)
 import IdePurescript.Completion (declarationTypeToNamespace, simplifyImportChoice)
 import IdePurescript.PscIde (eitherToErr)
 import IdePurescript.PscIdeServer (Notify)
@@ -128,14 +127,22 @@ encodeTypoResult :: TypoResult -> Foreign
 encodeTypoResult (TypoResult res) = unsafeToForeign
   (res { qualifier = Nullable.toNullable $ res.qualifier })
 
+-- | Read a nullable or undefined string value from Foreign
+readNullableString :: Foreign -> F (Maybe String)
+readNullableString f =
+  let nullable = unsafeFromForeign f :: Nullable.Nullable Foreign
+  in case Nullable.toMaybe nullable of
+    Nothing -> pure Nothing
+    Just f' -> Just <$> readString f'
+
 decodeTypoResult :: Foreign -> F TypoResult
 decodeTypoResult obj = do
   identifier <- obj ! "identifier" >>= readString
   mod <- obj ! "mod" >>= readString
   declarationType <-
     fromMaybe ""
-      <$> (obj ! "declarationType" >>= readNullOrUndefined readString)
-  qualifier <- obj ! "qualifier" >>= readNullOrUndefined readString
+      <$> (obj ! "declarationType" >>= readNullableString)
+  qualifier <- obj ! "qualifier" >>= readNullableString
   pure $ TypoResult { identifier, qualifier, mod, declarationType }
 
 fixTypoActions ::

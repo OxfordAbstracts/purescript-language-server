@@ -4,7 +4,6 @@ module LanguageServer.IdePurescript.Main
 
 import Prelude
 
-import Control.Monad.Except (runExcept)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Array ((!!))
@@ -31,7 +30,7 @@ import Effect.Console as Console
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import Foreign (Foreign, unsafeToForeign)
-import Foreign.JSON (parseJSON)
+import Data.Argonaut.Parser (jsonParser)
 import Foreign.Object (Object)
 import Foreign.Object as Object
 import IdePurescript.Modules (getModulesForFileTemp, initialModulesState)
@@ -626,7 +625,7 @@ main = do
         args.filename
       let
         config' = case args.config of
-          Just c -> either (const Nothing) Just $ runExcept $ parseJSON c
+          Just c -> either (const Nothing) (Just <<< unsafeToForeign) $ jsonParser c
           Nothing -> Nothing
       main' { config: config', filename: args.filename }
 
