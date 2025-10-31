@@ -84,11 +84,15 @@ pursTidyCommand = Command "purs-tidy" [ "format" ]
 poseCommand :: Command
 poseCommand = Command "prettier" [ "--parser", "purescript" ]
 
+pursfmtCommand :: Command
+pursfmtCommand = Command "pursfmt" [ "format" ]
+
 formatCmd :: Formatter -> Command
 formatCmd = case _ of
   Purty -> purtyCommand
   PursTidy -> pursTidyCommand
   Pose -> poseCommand
+  Pursfmt -> pursfmtCommand
   NoFormatter -> Command "echo" [] -- Not possible
 
 -- TODO for NoFormatter don't provide formatting provider

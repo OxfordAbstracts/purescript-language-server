@@ -195,6 +195,7 @@ data Formatter
   | Purty
   | PursTidy
   | Pose
+  | Pursfmt
 
 formatter :: ConfigFn Formatter
 formatter =
@@ -204,6 +205,7 @@ formatter =
       "purs-tidy" -> PursTidy
       "tidy" -> PursTidy
       "pose" -> Pose
+      "pursfmt" -> Pursfmt
       "" -> NoFormatter
       _ -> NoFormatter
 
